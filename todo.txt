@@ -1,0 +1,9 @@
+- UI Fixes 
+    - Make the score come in center at the top
+    - keep the dice at the right end and make it a lil short
+    - icon at the left end at the top
+    - grafetti or some cute winning thing
+
+- Game logic
+    - Fix the area marking logic
+    - add the end game logic and winning player logic
