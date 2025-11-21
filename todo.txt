@@ -5,5 +5,9 @@
     - grafetti or some cute winning thing
 
 - Game logic
-    - Fix the area marking logic
+    - Fix the area marking logic✅
     - add the end game logic and winning player logic
+
+- Other Improvements
+    - Settings : Sound effects on dice roll and dot connecting and shape making, this should be swithable - on & off
+    
