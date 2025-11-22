@@ -3,6 +3,8 @@
     - keep the dice at the right end and make it a lil short
     - icon at the left end at the top
     - grafetti or some cute winning thing
+    - fix color picking problem
+    - Mouse grags are not so flexible - little buggy, make them smooth
 
 - Game logic
     - Fix the area marking logic✅

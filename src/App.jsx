@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import SetupScreen from './components/SetupScreen.jsx';
 import GameBoard from './components/GameBoard.jsx';
+import { Analytics } from "@vercel/analytics/next"
 
 export default function App() {
   const [started, setStarted] = useState(false);
@@ -33,6 +34,7 @@ export default function App() {
       ) : (
         <GameBoard players={players} onRestart={() => setStarted(false)} />
       )}
+    <Analytics/> {/* for vercel analytics */}
     </>
   );
 }
