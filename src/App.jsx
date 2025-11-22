@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import SetupScreen from './components/SetupScreen.jsx';
 import GameBoard from './components/GameBoard.jsx';
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/react"
 
 export default function App() {
   const [started, setStarted] = useState(false);
