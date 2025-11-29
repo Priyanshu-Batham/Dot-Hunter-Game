@@ -13,3 +13,6 @@
 - Other Improvements
     - Settings : Sound effects on dice roll and dot connecting and shape making, this should be swithable - on & off
     
+- Gemini/Fallback AI Issues
+    - Gemini is not following game rules properly unlike fallback ai
+    - When playing with AI, if the cursor is dragged by user the moves are getting affected - block the user cursor moves when AI is playing ⚠️URGENT

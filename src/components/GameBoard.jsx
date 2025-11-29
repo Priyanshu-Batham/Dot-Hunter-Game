@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Trophy, RefreshCcw, ChevronRight } from 'lucide-react';
 import GameLogic from "../utils/gameLogic";
 import Dice from './Dice.jsx';
+import AILogic from '../utils/aiLogic';
+import AIIntegration from '../utils/aiIntegration';
 
 /**
  * ------------------------------------------------------------------
@@ -9,7 +11,6 @@ import Dice from './Dice.jsx';
  * ------------------------------------------------------------------
  */
 const GameOverModal = ({ scores, players, onRestart }) => {
-    // Determine the winner(s)
     const maxScore = Math.max(...scores);
     const winners = players.filter((_, i) => scores[i] === maxScore);
     const isTie = winners.length > 1;
@@ -56,38 +57,75 @@ const GameBoard = ({ players, onRestart }) => {
     const [movesLeft, setMovesLeft] = useState(0);
     const [diceVal, setDiceVal] = useState(0);
     const [isRolling, setIsRolling] = useState(false);
-    const [gameState, setGameState] = useState('rolling'); // 'rolling', 'playing', 'ended'
+    const [gameState, setGameState] = useState('rolling');
+    const [aiThinking, setAIThinking] = useState(false);
 
     // Dragging State
     const [dragStart, setDragStart] = useState(null);
-    const [dragCurrent, setDragCurrent] = useState(null); // {x, y}
+    const [dragCurrent, setDragCurrent] = useState(null);
 
     const containerRef = useRef(null);
+    const aiTurnInProgress = useRef(false);
+    
+    // CRITICAL: Refs to track actual current state during AI moves
+    const linesRef = useRef([]);
+    const polygonsRef = useRef([]);
+    const movesLeftRef = useRef(0);
+    
+    // Keep refs in sync with state
+    useEffect(() => {
+        linesRef.current = lines;
+    }, [lines]);
+    
+    useEffect(() => {
+        polygonsRef.current = polygons;
+    }, [polygons]);
+
+    useEffect(() => {
+        movesLeftRef.current = movesLeft;
+    }, [movesLeft]);
 
     // Initialize Board
     useEffect(() => {
+        console.log('🎮 Game initialized');
         if (containerRef.current) {
             const { clientWidth, clientHeight } = containerRef.current;
             setDots(GameLogic.generateStaggeredDots(clientWidth, clientHeight));
         }
     }, []);
 
-    // Game End Condition - Check if no more triangles can be formed
+    // Game End Condition
     useEffect(() => {
-        // Only check after some lines have been placed and game is in playing state
         if (gameState === 'playing' && lines.length >= 2) {
             const canFormTriangle = GameLogic.canFormAnyTriangle(lines, dots, polygons);
             if (!canFormTriangle) {
+                console.log('🏁 Game ended - no more triangles possible');
                 setGameState('ended');
             }
         }
     }, [lines, dots, gameState, polygons]);
 
-    const rollDice = () => {
-        if (gameState !== 'rolling' || isRolling) return;
+    // FIXED: Auto-roll dice for AI when it's their turn
+    useEffect(() => {
+        console.log(`🎲 Turn changed to: ${players[turn].name} (AI: ${players[turn].isAI}), Game State: ${gameState}`);
+        
+        if (gameState === 'rolling' && players[turn].isAI && !isRolling) {
+            console.log('🤖 AI turn detected, auto-rolling dice...');
+            setTimeout(() => {
+                rollDice();
+            }, 1000);
+        }
+    }, [turn, gameState]); // Trigger when turn or gameState changes
 
+    const rollDice = () => {
+        if (gameState !== 'rolling' || isRolling) {
+            console.log('⛔ Cannot roll dice', { gameState, isRolling });
+            return;
+        }
+
+        console.log(`🎲 Rolling dice for ${players[turn].name}...`);
         setIsRolling(true);
-        // Animate dice roll
+        
         let count = 0;
         const interval = setInterval(() => {
             setDiceVal(Math.ceil(Math.random() * 6));
@@ -99,27 +137,106 @@ const GameBoard = ({ players, onRestart }) => {
                 setMovesLeft(finalVal);
                 setGameState('playing');
                 setIsRolling(false);
+                
+                console.log(`🎲 Dice rolled: ${finalVal} for ${players[turn].name}`);
+
+                // FIXED: Trigger AI move if current player is AI
+                if (players[turn].isAI) {
+                    console.log('🤖 Starting AI turn with', finalVal, 'moves');
+                    setTimeout(() => makeAIMove(finalVal), 1000);
+                }
             }
         }, 100);
     };
 
     const nextTurn = () => {
-        setTurn(prev => (prev + 1) % players.length);
+        const nextPlayerIndex = (turn + 1) % players.length;
+        console.log(`➡️ Next turn: ${players[nextPlayerIndex].name}`);
+        
+        setTurn(nextPlayerIndex);
         setGameState('rolling');
         setMovesLeft(0);
         setDiceVal(0);
         setDragStart(null);
         setDragCurrent(null);
+        aiTurnInProgress.current = false; // ADDED: Reset AI lock
     };
 
-    // Utility to check if a set of three dot IDs forms a polygon already scored
+    // FIXED: Get ALL moves from Gemini once, then execute them sequentially
+    const makeAIMove = async (movesRemaining) => {
+        if (aiTurnInProgress.current) {
+            console.log('⚠️ AI turn already in progress');
+            return;
+        }
+
+        aiTurnInProgress.current = true;
+        console.log(`🤖 Starting AI turn with ${movesRemaining} moves`);
+
+        // Get fresh game state using refs for most current data
+        const gameStateForAI = {
+            dots,
+            lines: linesRef.current,
+            polygons: polygonsRef.current,
+            movesLeft: movesRemaining,
+            currentPlayerIndex: turn,
+            players
+        };
+
+        try {
+            console.log('📡 Calling Gemini API for all moves...');
+            setAIThinking(true);
+            
+            // Get ALL moves from Gemini in ONE API call
+            const aiMoves = await AILogic.getGeminiMoves(gameStateForAI);
+            console.log('📥 Received', aiMoves.length, 'moves from Gemini');
+
+            setAIThinking(false);
+
+            // Execute moves one by one with animation
+            await executeMovesSequentially(aiMoves);
+
+            console.log('✅ All AI moves completed');
+            aiTurnInProgress.current = false;
+            setTimeout(() => nextTurn(), 500);
+
+        } catch (error) {
+            console.error('❌ AI turn failed:', error);
+            setAIThinking(false);
+            aiTurnInProgress.current = false;
+            setTimeout(() => nextTurn(), 500);
+        }
+    };
+
+    // Helper function to execute moves sequentially with animation
+    const executeMovesSequentially = async (moves) => {
+        for (let i = 0; i < moves.length; i++) {
+            const move = moves[i];
+            console.log(`🎬 Executing move ${i + 1}/${moves.length}: ${move.from} -> ${move.to}`);
+
+            // Find dot objects (these are stable references)
+            const fromDot = dots.find(d => d.id === move.from);
+            const toDot = dots.find(d => d.id === move.to);
+
+            if (!fromDot || !toDot) {
+                console.warn('⚠️ Invalid dots, skipping move:', move);
+                continue;
+            }
+
+            // Animate the move
+            await AIIntegration.animateAIMove(fromDot, toDot, setDragStart, setDragCurrent);
+
+            // Execute the move with AI flag set to true
+            attemptConnection(fromDot, toDot, true);
+
+            // CRITICAL: Wait for React to process state updates before next move
+            await new Promise(resolve => setTimeout(resolve, 600));
+        }
+    };
+
     const isTriangleAlreadyScored = (p1Id, p2Id, p3Id) => {
-        // To check uniqueness, we create a canonical key by sorting the three IDs
         const ids = [p1Id, p2Id, p3Id].sort().join(',');
-        return polygons.some(p => p.points.map(d => d.id).sort().join(',') === ids);
+        return polygonsRef.current.some(p => p.points.map(d => d.id).sort().join(',') === ids);
     };
-
-    // --- DRAG INTERACTION HANDLERS ---
 
     const getRelativePos = (e) => {
         if (!containerRef.current) return { x: 0, y: 0 };
@@ -134,6 +251,8 @@ const GameBoard = ({ players, onRestart }) => {
 
     const handleMouseDown = (dot, e) => {
         if (gameState !== 'playing' || movesLeft <= 0 || gameState === 'ended') return;
+        if (players[turn].isAI) return;
+        
         setDragStart(dot);
         setDragCurrent({ x: dot.x, y: dot.y });
     };
@@ -147,68 +266,94 @@ const GameBoard = ({ players, onRestart }) => {
     const handleMouseUp = (e) => {
         if (!dragStart) return;
 
-        // Check if we released over a dot
         const pos = getRelativePos(e);
-        const hitRadius = 30; // generous hit area
+        const hitRadius = 30;
         const targetDot = dots.find(d => Math.hypot(d.x - pos.x, d.y - pos.y) < hitRadius);
 
         if (targetDot && targetDot.id !== dragStart.id) {
-            attemptConnection(dragStart, targetDot);
+            attemptConnection(dragStart, targetDot, false);
         }
 
         setDragStart(null);
         setDragCurrent(null);
     };
 
-    const attemptConnection = (p1, p2) => {
+    // FIXED: Properly handle AI vs Human moves
+    const attemptConnection = (p1, p2, isAIMove = false) => {
+        console.log(`🔍 Attempting connection: ${p1.id} -> ${p2.id} (AI: ${isAIMove})`);
+        
+        // CRITICAL: Use refs for AI moves to get most current state
+        const currentLines = isAIMove ? linesRef.current : lines;
+        const currentPolygons = isAIMove ? polygonsRef.current : polygons;
+        
         // 1. Check duplication
-        const exists = lines.some(l =>
+        const exists = currentLines.some(l =>
             (l.from === p1.id && l.to === p2.id) || (l.from === p2.id && l.to === p1.id)
         );
-        if (exists) return;
+        if (exists) {
+            console.log('⛔ Line already exists');
+            return;
+        }
 
-        // 2. Check if any dot lies on this line (NEW CHECK)
-        if (GameLogic.hasIntermediateDot(p1, p2, dots)) return;
+        // 2. Check intermediate dots
+        if (GameLogic.hasIntermediateDot(p1, p2, dots)) {
+            console.log('⛔ Intermediate dot found');
+            return;
+        }
 
-        // 3. Check Intersection (Logic Module)
-        const intersect = lines.some(l => {
+        // 3. Check intersection
+        const intersect = currentLines.some(l => {
             if (l.from === p1.id || l.to === p1.id || l.from === p2.id || l.to === p2.id) return false;
             const l1 = dots.find(d => d.id === l.from);
             const l2 = dots.find(d => d.id === l.to);
             return GameLogic.doLinesIntersect(p1, p2, l1, l2);
         });
-        if (intersect) return;
-
-        // 4. Check if this line would create a polygon with 4+ sides
-        const newLine = { from: p1.id, to: p2.id, ownerId: turn };
-        const testLines = [...lines, newLine];
-
-        if (GameLogic.wouldCreateLargerPolygon(p1.id, p2.id, testLines)) {
+        if (intersect) {
+            console.log('⛔ Line intersection detected');
             return;
         }
 
-        // 5. Valid Move -> Commit
+        // 4. Check 4+ polygon
+        const newLine = { from: p1.id, to: p2.id, ownerId: turn };
+        const testLines = [...currentLines, newLine];
+
+        if (GameLogic.wouldCreateLargerPolygon(p1.id, p2.id, testLines)) {
+            console.log('⛔ Would create 4+ sided polygon');
+            return;
+        }
+
+        // 5. Valid move
+        console.log('✅ Valid move, adding line');
         const newLines = testLines;
-
         const newTriangle = GameLogic.findNewTriangles(p1.id, p2.id, newLines, dots, turn);
-
-        let scored = false;
 
         if (newTriangle) {
             const pIds = newTriangle.points.map(p => p.id);
             if (!isTriangleAlreadyScored(pIds[0], pIds[1], pIds[2])) {
-                setPolygons(prev => [...prev, newTriangle]);
-                scored = true;
+                console.log('🎉 Triangle completed!');
+                const updatedPolygons = [...currentPolygons, newTriangle];
+                setPolygons(updatedPolygons);
+                // Update ref immediately for AI moves
+                if (isAIMove) {
+                    polygonsRef.current = updatedPolygons;
+                }
             }
         }
 
         setLines(newLines);
+        // Update ref immediately for AI moves
+        if (isAIMove) {
+            linesRef.current = newLines;
+        }
 
-        const newMoves = movesLeft - 1;
-        setMovesLeft(newMoves);
+        // ONLY decrement moves for human players
+        if (!isAIMove) {
+            const newMoves = movesLeft - 1;
+            setMovesLeft(newMoves);
 
-        if (newMoves === 0) {
-            setTimeout(() => nextTurn(), 500);
+            if (newMoves === 0) {
+                setTimeout(() => nextTurn(), 500);
+            }
         }
     };
 
@@ -217,10 +362,18 @@ const GameBoard = ({ players, onRestart }) => {
     return (
         <div className="h-screen w-screen bg-[#fcfbf9] flex flex-col font-handwriting overflow-hidden text-stone-800">
 
-            {/* --- GAME OVER MODAL --- */}
             {gameState === 'ended' && <GameOverModal scores={scores} players={players} onRestart={onRestart} />}
 
-            {/* --- HEADER / HUD --- */}
+            {aiThinking && (
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
+                                bg-white px-6 py-3 rounded-xl shadow-xl border-2 border-stone-800 
+                                flex items-center gap-3 z-50">
+                    <div className="animate-spin w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full" />
+                    <span className="font-bold text-stone-800">Gemini is thinking...</span>
+                </div>
+            )}
+
+            {/* HEADER */}
             <div className="w-full px-6 py-4 flex justify-between items-center z-10">
                 <div className="flex gap-4">
                     {players.map((p, i) => (
@@ -250,14 +403,12 @@ const GameBoard = ({ players, onRestart }) => {
                             Moves Left: {movesLeft}
                         </div>
                     )}
-                    <Dice value={diceVal} rolling={isRolling} disabled={gameState !== 'rolling' || gameState === 'ended'} onRoll={rollDice} />
+                    <Dice value={diceVal} rolling={isRolling} disabled={gameState !== 'rolling' || gameState === 'ended' || players[turn].isAI} onRoll={rollDice} />
                 </div>
             </div>
 
-            {/* --- GAME AREA --- */}
+            {/* GAME AREA */}
             <div className="flex-1 w-full px-6 pb-6 flex flex-col">
-
-                {/* The Paper */}
                 <div className="relative w-full h-full bg-white rounded-sm shadow-2xl overflow-hidden border border-stone-200"
                     style={{
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
@@ -265,20 +416,13 @@ const GameBoard = ({ players, onRestart }) => {
                         backgroundSize: '24px 24px'
                     }}>
 
-                    {/* SVG Layer (Lines, Shapes, Drag Preview) */}
-                    <svg
-                        className="absolute inset-0 w-full h-full pointer-events-none z-10"
-                    >
-                        {/* Closed Triangles */}
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
                         {polygons.map((poly, i) => {
                             const pts = poly.points.map(p => `${p.x},${p.y}`).join(' ');
                             return (
                                 <g key={i} className="animate-fadeIn">
-                                    {/* Triangle Fill */}
                                     <polygon points={pts} fill={players[poly.ownerId].color} fillOpacity="0.25" stroke="none" />
-                                    {/* Centered Icon - Using a Triangle SVG for visual emphasis */}
                                     {(() => {
-                                        // Calculate center of the triangle (centroid)
                                         const cx = poly.points.reduce((s, p) => s + p.x, 0) / poly.points.length;
                                         const cy = poly.points.reduce((s, p) => s + p.y, 0) / poly.points.length;
                                         return (
@@ -293,7 +437,6 @@ const GameBoard = ({ players, onRestart }) => {
                             );
                         })}
 
-                        {/* Existing Lines */}
                         {lines.map((line, i) => {
                             const p1 = dots.find(d => d.id === line.from);
                             const p2 = dots.find(d => d.id === line.to);
@@ -306,7 +449,6 @@ const GameBoard = ({ players, onRestart }) => {
                             );
                         })}
 
-                        {/* Drag Preview Line */}
                         {dragStart && dragCurrent && gameState !== 'ended' && (
                             <line
                                 x1={dragStart.x} y1={dragStart.y} x2={dragCurrent.x} y2={dragCurrent.y}
@@ -316,10 +458,9 @@ const GameBoard = ({ players, onRestart }) => {
                         )}
                     </svg>
 
-                    {/* Interaction Layer (Dots) */}
                     <div
                         ref={containerRef}
-                        className="absolute inset-0 z-20 touch-none" // touch-none prevents scrolling on mobile while dragging
+                        className="absolute inset-0 z-20 touch-none"
                         onMouseMove={handleMouseMove}
                         onMouseUp={handleMouseUp}
                         onTouchMove={handleMouseMove}
@@ -337,14 +478,13 @@ const GameBoard = ({ players, onRestart }) => {
                                 `}
                                 style={{
                                     left: dot.x, top: dot.y,
-                                    backgroundColor: dragStart?.id === dot.id ? players[turn].color : '#a8a29e', // Stone-400 inactive, player color active
+                                    backgroundColor: dragStart?.id === dot.id ? players[turn].color : '#a8a29e',
                                 }}
                             />
                         ))}
                     </div>
                 </div>
 
-                {/* Footer Info */}
                 <div className="pt-4 text-stone-400 text-sm font-bold tracking-widest uppercase text-center">
                     Drag between dots to connect • Close <span className="text-stone-600">Triangles</span> to score
                 </div>
