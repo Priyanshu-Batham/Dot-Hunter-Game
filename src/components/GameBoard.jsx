@@ -369,7 +369,7 @@ const GameBoard = ({ players, onRestart }) => {
                                 bg-white px-6 py-3 rounded-xl shadow-xl border-2 border-stone-800 
                                 flex items-center gap-3 z-50">
                     <div className="animate-spin w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full" />
-                    <span className="font-bold text-stone-800">Gemini is thinking...</span>
+                    <span className="font-bold text-stone-800">Hunter AI is thinking...</span>
                 </div>
             )}
 
