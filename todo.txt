@@ -16,3 +16,4 @@
 - Gemini/Fallback AI Issues
     - Gemini is not following game rules properly unlike fallback ai
     - When playing with AI, if the cursor is dragged by user the moves are getting affected - block the user cursor moves when AI is playing ⚠️URGENT
+    - Currently, the fallback AI plays really well to make the best moves, but it lacks clever behavior, so imagine 1 move is left so instead complete a 2 side incomplete triangle, it should make a whole new line so that the opponent does NOT benefit from it.

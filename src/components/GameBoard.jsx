@@ -253,12 +253,16 @@ const GameBoard = ({ players, onRestart }) => {
         if (gameState !== 'playing' || movesLeft <= 0 || gameState === 'ended') return;
         if (players[turn].isAI) return;
         
+        e.preventDefault(); // ! CRITICAL: Prevent default for touch events
+        
         setDragStart(dot);
         setDragCurrent({ x: dot.x, y: dot.y });
     };
-
+    
     const handleMouseMove = (e) => {
         if (!dragStart) return;
+        e.preventDefault(); // ! CRITICAL: Prevent default for touch events
+        
         const pos = getRelativePos(e);
         setDragCurrent(pos);
     };
@@ -472,7 +476,7 @@ const GameBoard = ({ players, onRestart }) => {
                                 key={dot.id}
                                 onMouseDown={(e) => handleMouseDown(dot, e)}
                                 onTouchStart={(e) => handleMouseDown(dot, e)}
-                                className={`absolute w-6 h-6 rounded-full transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform duration-200
+                                className={`absolute w-6 h-6 md:w-6 md:h-6 sm:w-10 sm:h-10 rounded-full transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform duration-200
                                     ${dragStart?.id === dot.id ? 'scale-150 ring-4 ring-stone-200 z-30' : 'hover:scale-150 z-20'}
                                     ${gameState === 'ended' ? 'cursor-default' : ''}
                                 `}
