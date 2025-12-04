@@ -385,21 +385,20 @@ const GameBoard = ({ players, onRestart }) => {
                 </div>
             )}
 
-            {/* HEADER - FIXED: Scrollable player blocks on mobile */}
-            <div className="w-full px-6 py-2 flex items-center z-10 gap-4">
-                {/* NEW: Scrollable container for players on mobile */}
-                <div className="flex gap-4 overflow-x-auto flex-1 min-w-0 scrollbar-hide">
+            {/* HEADER - KEPT FROM FILE 1 (proper layout) */}
+            <div className="w-full px-6 py-4 flex justify-between items-center z-10">
+                <div className="flex gap-4">
                     {players.map((p, i) => (
                         <div
                             key={i}
-                            className={`relative px-5 py-2 rounded-2xl border-2 transition-all duration-300 flex items-center gap-3 shrink-0
+                            className={`relative px-5 py-2 rounded-2xl border-2 transition-all duration-300 flex items-center gap-3
                                 ${turn === i && gameState !== 'ended' ? 'bg-white border-stone-800 shadow-md -translate-y-1' : 'bg-transparent border-transparent opacity-50'}
                             `}
                         >
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
                             <div className="flex flex-col leading-none">
-                                <span className="font-bold text-lg whitespace-nowrap">{p.name}</span>
-                                <span className="text-xs font-bold text-stone-400 uppercase tracking-widest whitespace-nowrap">Triangles: {scores[i]}</span>
+                                <span className="font-bold text-lg">{p.name}</span>
+                                <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Triangles: {scores[i]}</span>
                             </div>
                             {turn === i && gameState !== 'ended' && (
                                 <div className="absolute -top-2 -right-2 bg-stone-800 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs animate-bounce">
@@ -410,10 +409,9 @@ const GameBoard = ({ players, onRestart }) => {
                     ))}
                 </div>
 
-                {/* Dice stays fixed on right */}
-                <div className="flex items-center gap-4 shrink-0">
+                <div className="flex items-center gap-4">
                     {gameState === 'playing' && (
-                        <div className="bg-stone-100 px-4 py-2 rounded-xl font-bold text-stone-600 whitespace-nowrap">
+                        <div className="bg-stone-100 px-4 py-2 rounded-xl font-bold text-stone-600">
                             Moves Left: {movesLeft}
                         </div>
                     )}
@@ -430,7 +428,8 @@ const GameBoard = ({ players, onRestart }) => {
                         backgroundSize: '24px 24px'
                     }}>
 
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
+                    {/* FIXED: Changed z-10 to z-0 so SVG stays BELOW header */}
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
                         {polygons.map((poly, i) => {
                             const pts = poly.points.map(p => `${p.x},${p.y}`).join(' ');
                             return (
@@ -486,7 +485,7 @@ const GameBoard = ({ players, onRestart }) => {
                                 key={dot.id}
                                 onMouseDown={(e) => handleMouseDown(dot, e)}
                                 onTouchStart={(e) => handleMouseDown(dot, e)}
-                                className={`absolute w-8 h-8 md:w-6 md:h-6 rounded-full transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform duration-200
+                                className={`absolute w-6 h-6 md:w-6 md:h-6 sm:w-10 sm:h-10 rounded-full transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform duration-200
                                     ${dragStart?.id === dot.id ? 'scale-150 ring-4 ring-stone-200 z-30' : 
                                       nearestDot?.id === dot.id ? 'scale-150 ring-4 ring-green-300 z-30' : 
                                       'hover:scale-150 z-20'}
@@ -494,7 +493,7 @@ const GameBoard = ({ players, onRestart }) => {
                                 `}
                                 style={{
                                     left: dot.x, top: dot.y,
-                                    backgroundColor: dragStart?.id === dot.id ? players[turn].color : '#a8a29e',
+                                    backgroundColor: dragStart?.id === dot.id || nearestDot?.id === dot.id ? players[turn].color : '#a8a29e',
                                 }}
                             />
                         ))}
