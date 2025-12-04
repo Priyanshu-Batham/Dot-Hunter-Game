@@ -63,6 +63,7 @@ const GameBoard = ({ players, onRestart }) => {
     // Dragging State
     const [dragStart, setDragStart] = useState(null);
     const [dragCurrent, setDragCurrent] = useState(null);
+    const [nearestDot, setNearestDot] = useState(null); // NEW: Track nearest dot for mobile
 
     const containerRef = useRef(null);
     const aiTurnInProgress = useRef(false);
@@ -159,6 +160,7 @@ const GameBoard = ({ players, onRestart }) => {
         setDiceVal(0);
         setDragStart(null);
         setDragCurrent(null);
+        setNearestDot(null); // NEW: Reset nearest dot
         aiTurnInProgress.current = false; // ADDED: Reset AI lock
     };
 
@@ -265,21 +267,27 @@ const GameBoard = ({ players, onRestart }) => {
         
         const pos = getRelativePos(e);
         setDragCurrent(pos);
+
+        // NEW: Find nearest dot during drag (for mobile connection + visual feedback)
+        const hitRadius = 50; // Increased radius for mobile touch
+        const closest = dots.find(d => 
+            d.id !== dragStart.id && 
+            Math.hypot(d.x - pos.x, d.y - pos.y) < hitRadius
+        );
+        setNearestDot(closest || null);
     };
 
     const handleMouseUp = (e) => {
         if (!dragStart) return;
 
-        const pos = getRelativePos(e);
-        const hitRadius = 30;
-        const targetDot = dots.find(d => Math.hypot(d.x - pos.x, d.y - pos.y) < hitRadius);
-
-        if (targetDot && targetDot.id !== dragStart.id) {
-            attemptConnection(dragStart, targetDot, false);
+        // NEW: Use nearest dot tracked during drag (fixes mobile touch connection)
+        if (nearestDot && nearestDot.id !== dragStart.id) {
+            attemptConnection(dragStart, nearestDot, false);
         }
 
         setDragStart(null);
         setDragCurrent(null);
+        setNearestDot(null); // NEW: Reset nearest dot
     };
 
     // FIXED: Properly handle AI vs Human moves
@@ -377,20 +385,21 @@ const GameBoard = ({ players, onRestart }) => {
                 </div>
             )}
 
-            {/* HEADER */}
-            <div className="w-full px-6 py-4 flex justify-between items-center z-10">
-                <div className="flex gap-4">
+            {/* HEADER - FIXED: Scrollable player blocks on mobile */}
+            <div className="w-full px-6 py-2 flex items-center z-10 gap-4">
+                {/* NEW: Scrollable container for players on mobile */}
+                <div className="flex gap-4 overflow-x-auto flex-1 min-w-0 scrollbar-hide">
                     {players.map((p, i) => (
                         <div
                             key={i}
-                            className={`relative px-5 py-2 rounded-2xl border-2 transition-all duration-300 flex items-center gap-3
+                            className={`relative px-5 py-2 rounded-2xl border-2 transition-all duration-300 flex items-center gap-3 shrink-0
                                 ${turn === i && gameState !== 'ended' ? 'bg-white border-stone-800 shadow-md -translate-y-1' : 'bg-transparent border-transparent opacity-50'}
                             `}
                         >
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
                             <div className="flex flex-col leading-none">
-                                <span className="font-bold text-lg">{p.name}</span>
-                                <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Triangles: {scores[i]}</span>
+                                <span className="font-bold text-lg whitespace-nowrap">{p.name}</span>
+                                <span className="text-xs font-bold text-stone-400 uppercase tracking-widest whitespace-nowrap">Triangles: {scores[i]}</span>
                             </div>
                             {turn === i && gameState !== 'ended' && (
                                 <div className="absolute -top-2 -right-2 bg-stone-800 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs animate-bounce">
@@ -401,9 +410,10 @@ const GameBoard = ({ players, onRestart }) => {
                     ))}
                 </div>
 
-                <div className="flex items-center gap-4">
+                {/* Dice stays fixed on right */}
+                <div className="flex items-center gap-4 shrink-0">
                     {gameState === 'playing' && (
-                        <div className="bg-stone-100 px-4 py-2 rounded-xl font-bold text-stone-600">
+                        <div className="bg-stone-100 px-4 py-2 rounded-xl font-bold text-stone-600 whitespace-nowrap">
                             Moves Left: {movesLeft}
                         </div>
                     )}
@@ -469,15 +479,17 @@ const GameBoard = ({ players, onRestart }) => {
                         onMouseUp={handleMouseUp}
                         onTouchMove={handleMouseMove}
                         onTouchEnd={handleMouseUp}
-                        onMouseLeave={() => { setDragStart(null); setDragCurrent(null); }}
+                        onMouseLeave={() => { setDragStart(null); setDragCurrent(null); setNearestDot(null); }}
                     >
                         {dots.map(dot => (
                             <div
                                 key={dot.id}
                                 onMouseDown={(e) => handleMouseDown(dot, e)}
                                 onTouchStart={(e) => handleMouseDown(dot, e)}
-                                className={`absolute w-6 h-6 md:w-6 md:h-6 sm:w-10 sm:h-10 rounded-full transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform duration-200
-                                    ${dragStart?.id === dot.id ? 'scale-150 ring-4 ring-stone-200 z-30' : 'hover:scale-150 z-20'}
+                                className={`absolute w-8 h-8 md:w-6 md:h-6 rounded-full transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform duration-200
+                                    ${dragStart?.id === dot.id ? 'scale-150 ring-4 ring-stone-200 z-30' : 
+                                      nearestDot?.id === dot.id ? 'scale-150 ring-4 ring-green-300 z-30' : 
+                                      'hover:scale-150 z-20'}
                                     ${gameState === 'ended' ? 'cursor-default' : ''}
                                 `}
                                 style={{
