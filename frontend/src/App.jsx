@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import SetupScreen from './components/SetupScreen.jsx';
 import GameBoard from './components/GameBoard.jsx';
+import GameBoardMP from './components/GameBoardMP.jsx';
 import { Analytics } from "@vercel/analytics/react"
 
 export default function App() {
   const [started, setStarted] = useState(false);
   const [players, setPlayers] = useState([]);
+  const [multiplayerName, setMultiplayerName] = useState("You");
+  const [mode, setMode] = useState("offline");
 
   // Font Injection
   useEffect(() => {
@@ -29,10 +32,13 @@ export default function App() {
 
       {!started ? (
         <div className="min-h-screen w-screen bg-[#fcfbf9] flex items-center justify-center p-4">
-          <SetupScreen onStart={(p) => { setPlayers(p); setStarted(true); }} />
+          <SetupScreen onStart={(p) => { setPlayers(p); setStarted(true); }} onStartMP={(p)=>{setMultiplayerName(p); setMode("online"); setStarted(true)}}/>
         </div>
       ) : (
-        <GameBoard players={players} onRestart={() => setStarted(false)} />
+        mode==="offline"? (
+          <GameBoard players={players} onRestart={() => setStarted(false)} />
+        ):
+        (<GameBoardMP name={multiplayerName} onRestart={() => setStarted(false)} />)
       )}
     <Analytics/> {/* for vercel analytics */}
     </>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Play, Sparkles } from 'lucide-react';
 
-const SetupScreen = ({ onStart }) => {
+const SetupScreen = ({ onStart, onStartMP }) => {
   const [playerCount, setPlayerCount] = useState(2);
   const [geminiEnabled, setGeminiEnabled] = useState(false);
   const [players, setPlayers] = useState([
@@ -77,6 +77,18 @@ const SetupScreen = ({ onStart }) => {
   };
 
   const handleStart = () => onStart(players);
+
+  // NEW: multiplayer handler
+  const handleMultiplayerStart = () => {
+    const mpPlayers = [
+      { name: players[0]?.name || "You", color: '#ec0808ff', isAI: false },
+      { name: players[0]?.name || "anonymous", color: '#3b82f6', isAI: false }
+    ];
+    
+    const name=players[0]?.name || "You";
+
+    onStartMP(name);
+  };
 
   return (
     <div className="w-full max-w-md bg-white p-8 rounded-3xl shadow-xl border-2 border-stone-100 font-handwriting">
@@ -164,12 +176,26 @@ const SetupScreen = ({ onStart }) => {
         </div>
       </div>
 
-      <button 
-        onClick={handleStart}
-        className="w-full py-4 bg-stone-800 text-white rounded-xl font-bold text-xl hover:bg-stone-700 hover:shadow-lg transition-all flex items-center justify-center gap-2"
-      >
-        <Play size={24} fill="currentColor" /> Play Game
-      </button>
+      <div className="space-y-3">
+        {/* OFFLINE GAME */}
+        <button 
+          onClick={handleStart}
+          className="w-full py-4 bg-stone-800 text-white rounded-xl font-bold text-xl
+                    hover:bg-stone-700 hover:shadow-lg transition-all flex items-center justify-center gap-2"
+        >
+          <Play size={24} fill="currentColor" /> Play Offline
+        </button>
+
+        {/* MULTIPLAYER GAME */}
+        <button 
+          onClick={handleMultiplayerStart}
+          className="w-full py-3 border-2 text-white border-stone-800 text-stone-800 rounded-xl font-bold text-lg
+                    hover:bg-stone-800 hover:text-white transition-all flex items-center justify-center gap-2"
+        >
+          🌐 Play Multiplayer
+        </button>
+      </div>
+
     </div>
   );
 };
